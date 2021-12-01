@@ -1,8 +1,10 @@
-import tensorflow as tf
-import numpy as np
-from tensorflow.examples.tutorials.mnist import mnist
-from tensorflow.examples.tutorials.mnist import input_data
-import cdbn_backup as cdbn
+import tensorflow.compat.v1 as tf
+import tensorflow_probability as tfp
+from tensorflow.keras.utils import to_categorical
+
+import CDBN as cdbn
+import CRBM as crbm
+tf.disable_eager_execution()
 
 
 """ --------------------------------------------
@@ -11,11 +13,14 @@ import cdbn_backup as cdbn
 
 class MNIST_HANDLER(object):
   
-  def __init__(self, data):
-    self.num_training_example = data.train.num_examples
-    self.num_test_example     = data.test.num_examples
-    self.training_data , self.training_labels = data.train.next_batch(self.num_training_example)
-    self.test_data , self.test_labels        = data.test.next_batch(self.num_test_example)
+  def __init__(self, training_data, training_labels, test_data, test_labels):
+    self.training_data = training_data
+    self.training_labels = training_labels
+    self.test_data = test_data
+    self.test_labels = test_labels
+	
+    self.num_training_example = training_data.shape[0]
+    self.num_test_example     = test_data.shape[0]
     self.whiten               = False
     self.training_index       = -20
     self.test_index           = -20
@@ -74,9 +79,19 @@ class MNIST_HANDLER(object):
       result = operand[index:index + batch_size,:]
       result_bis = operand_bis[index:index + batch_size,:]
     return result, result_bis
-        
 
-mnist_dataset = MNIST_HANDLER(input_data.read_data_sets('data', one_hot=True))
+
+mnist = tf.keras.datasets.mnist
+(train_images, train_labels_normal),(test_images, test_labels_normal) = mnist.load_data()
+train_labels = to_categorical(train_labels_normal,10)
+test_labels = to_categorical(test_labels_normal,10)
+train_images = train_images/255
+test_images = test_images/255
+
+train_images = train_images.reshape(60000,784)
+test_images = test_images.reshape(10000,784)
+
+mnist_dataset = MNIST_HANDLER(train_images, train_labels, test_images, test_labels)
 #mnist_dataset.do_whiten()
 sess = tf.Session()
 
@@ -87,38 +102,43 @@ sess = tf.Session()
     ------------------- MODEL -------------------
     --------------------------------------------- """
 
-my_cdbn = cdbn.CDBN('mnist_cdbn', 20, '/home/arthur/pedestrian_detection/log', mnist_dataset, sess, verbosity = 2)
+
+my_cdbn = cdbn.CDBN('mnist_cdbn', 20, '/home/', mnist_dataset, sess, verbosity = 2)
 
 my_cdbn.add_layer('layer_1', fully_connected = False, v_height = 28, v_width = 28, v_channels = 1, f_height = 11, f_width = 11, f_number = 40, 
                init_biases_H = -3, init_biases_V = 0.01, init_weight_stddev = 0.01, 
                gaussian_unit = True, gaussian_variance = 0.2, 
                prob_maxpooling = True, padding = True, 
-               learning_rate = 0.00005, learning_rate_decay = 0.5, momentum = 0.9, decay_step = 50000,  
+               learning_rate = 0.0001, learning_rate_decay = 0.6, momentum = 0.5, decay_step = 50000,  
                weight_decay = 2.0, sparsity_target = 0.003, sparsity_coef = 0.1)
 
 my_cdbn.add_layer('layer_2', fully_connected = False, v_height = 14, v_width = 14, v_channels = 40, f_height = 7, f_width = 7, f_number = 40, 
                init_biases_H = -3, init_biases_V = 0.025, init_weight_stddev = 0.025, 
                gaussian_unit = False, gaussian_variance = 0.2, 
                prob_maxpooling = True, padding = True, 
-               learning_rate = 0.0025, learning_rate_decay = 0.5, momentum = 0.9, decay_step = 50000,  
+               learning_rate = 0.005, learning_rate_decay = 0.8, momentum = 0.9, decay_step = 50000,  
                weight_decay = 0.1, sparsity_target = 0.1, sparsity_coef = 0.1)
 
-my_cdbn.add_layer('layer_3', fully_connected = True, v_height = 1, v_width = 1, v_channels = 40*7*7, f_height = 1, f_width = 1, f_number = 200, 
-               init_biases_H = -3, init_biases_V = 0.025, init_weight_stddev = 0.025, 
-               gaussian_unit = False, gaussian_variance = 0.2, 
-               prob_maxpooling = False, padding = False, 
-               learning_rate = 0.0025, learning_rate_decay = 0.5, momentum = 0.9, decay_step = 50000,  
-               weight_decay = 0.1, sparsity_target = 0.1, sparsity_coef = 0.1)
+# my_cdbn.add_layer('layer_3', fully_connected = True, v_height = 1, v_width = 1, v_channels = 40*7*7, f_height = 1, f_width = 1, f_number = 200, 
+#                init_biases_H = -3, init_biases_V = 0.025, init_weight_stddev = 0.025, 
+#                gaussian_unit = False, gaussian_variance = 0.2, 
+#                prob_maxpooling = False, padding = False, 
+#                learning_rate = 0.0025, learning_rate_decay = 0.5, momentum = 0.9, decay_step = 50000,  
+#                weight_decay = 0.1, sparsity_target = 0.1, sparsity_coef = 0.1)
 
-my_cdbn.add_softmax_layer(10, 0.1)
+my_cdbn.add_softmax_layer(10, 0.10)
 
 my_cdbn.lock_cdbn()
 
+tf.get_variable_scope().reuse_variables() ## TO CHECK
 
 
 
 """ ---------------------------------------------
     ------------------ TRAINING -----------------
     --------------------------------------------- """
-my_cdbn.manage_layers(['layer_1','layer_2','layer_3'],[],[10000,10000,10000], [1,1,1], 20000, restore_softmax = False, fine_tune = True)
+# tf.debugging.enable_check_numerics() 
+
+# my_cdbn.manage_layers(['layer_1','layer_2','layer_3'],[],[5000,10000,10000], [1,1,1], 20000, restore_softmax = False, fine_tune = True)
+my_cdbn.manage_layers(['layer_1','layer_2'],[],[10000,20000], [1,1], 20000, restore_softmax = False, fine_tune = True)
 my_cdbn.do_eval()
