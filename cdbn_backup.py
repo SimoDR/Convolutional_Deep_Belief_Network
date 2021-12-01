@@ -1,9 +1,9 @@
 from __future__ import division
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import numpy as np
 import time
 import os
-import crbm_backup as crbm
+import CRBM as crbm
 
 
 class CDBN(object):
@@ -34,7 +34,7 @@ class CDBN(object):
     self.name                       =     name
     self.batch_size                 =     batch_size 
     self.path                       =     path + "/" + name
-    tf.gfile.MakeDirs(self.path) 
+    tf.io.gfile.makedirs(self.path) 
     self.data                       =     data
     self.session                    =     session
     self.verbosity                  =     verbosity
@@ -115,7 +115,7 @@ class CDBN(object):
                                                 weight_decay, sparsity_target, sparsity_coef)
         self.number_layer = self.number_layer + 1
         'Where to save and restore parameter of this layer'
-        tf.gfile.MakeDirs(self.path + "/" + name) 
+        tf.io.gfile.makedirs(self.path + "/" + name) 
         
         if self.verbosity > 0:
           print('--------------------------')
@@ -158,12 +158,12 @@ class CDBN(object):
         self.softmax_layer  = True
         self.output_classes = output_classes
         ret_out = self.layer_name_to_object[self.layer_level_to_name[self.number_layer-1]]
-        self.output = ret_out.hidden_height / (ret_out.prob_maxpooling + 1) * ret_out.hidden_width / (ret_out.prob_maxpooling + 1)  * ret_out.filter_number
+        self.output = int(ret_out.hidden_height / (ret_out.prob_maxpooling + 1) * ret_out.hidden_width / (ret_out.prob_maxpooling + 1)  * ret_out.filter_number)
         with tf.variable_scope('softmax_layer_cdbn'):
           with tf.device('/cpu:0'):
             self.W            = tf.get_variable('weights_softmax', (self.output, output_classes), initializer=tf.truncated_normal_initializer(stddev=1/self.output, dtype=tf.float32), dtype=tf.float32)
             self.b            = tf.get_variable('bias_softmax', (output_classes), initializer=tf.constant_initializer(0), dtype=tf.float32)
-        tf.gfile.MakeDirs(self.path + "/" + 'softmax_layer') 
+        tf.io.gfile.makedirs(self.path + "/" + 'softmax_layer') 
        
         if self.verbosity > 0:
           print('--------------------------')
@@ -175,14 +175,14 @@ class CDBN(object):
         eval = tf.reshape(self._get_input_level(self.number_layer,self.input_placeholder), [self.batch_size, -1])
         y = tf.nn.softmax(tf.matmul(eval, self.W) + self.b)
         self.y_ = tf.placeholder(tf.float32, [None,self.output_classes])
-        cross_entropy = tf.reduce_mean(-tf.reduce_sum(self.y_ * tf.log(y), reduction_indices=[1]))
-        self.cross_entropy_mean = tf.reduce_mean(cross_entropy)
+        cross_entropy = tf.math.reduce_mean(-tf.math.reduce_sum(self.y_ * tf.log(y), reduction_indices=[1]))
+        self.cross_entropy_mean = tf.math.reduce_mean(cross_entropy)
         if fine_tune:
           self.train_step = self.softmax_trainer.minimize(cross_entropy)
         else:
           (ret_w_0 , ret_w_1), ret_b = self.softmax_trainer.compute_gradients(cross_entropy, var_list=[self.W,self.b])
           self.train_step = self.softmax_trainer.apply_gradients([(ret_w_0 , ret_w_1), ret_b])
-          self.control =  tf.reduce_mean(tf.abs(tf.div(tf.mul(ret_w_0,learning_rate),ret_w_1))) 
+          self.control =  tf.math.reduce_mean(tf.abs(tf.math.divide_no_nan(tf.multiply(ret_w_0,learning_rate),ret_w_1))) 
     except ValueError as error:
       self._print_error_message(error)
       
@@ -286,7 +286,9 @@ class CDBN(object):
     
   def do_eval(self, f1 = False):
     """INTENT : Evaluate the CDBN as a classifier"""
-    
+
+    tf.get_variable_scope().reuse_variables() ## TO CHECK
+
     input_placeholder  = tf.placeholder(tf.float32, shape=self.input)
     
     eval = tf.reshape(self._get_input_level(self.number_layer,input_placeholder), [self.batch_size, -1])
@@ -299,17 +301,17 @@ class CDBN(object):
       zeros = tf.zeros_like(predicted_class)
       ones  = tf.ones_like(predicted_class)
       
-      true_positive = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, ones),tf.equal(real_class, ones)), tf.float32))
+      true_positive = tf.math.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, ones),tf.equal(real_class, ones)), tf.float32))
       tp_count = 0
-      false_positive = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, ones),tf.equal(real_class, zeros)), tf.float32))
+      false_positive = tf.math.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, ones),tf.equal(real_class, zeros)), tf.float32))
       fp_count = 0
-      true_negative = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, zeros),tf.equal(real_class, zeros)), tf.float32))
+      true_negative = tf.math.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, zeros),tf.equal(real_class, zeros)), tf.float32))
       tn_count = 0
-      false_negative = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, zeros),tf.equal(real_class, ones)), tf.float32))
+      false_negative = tf.math.reduce_sum(tf.cast(tf.logical_and(tf.equal(predicted_class, zeros),tf.equal(real_class, ones)), tf.float32))
       fn_count = 0
     else:
       correct_prediction = tf.equal(tf.argmax(y,1), tf.argmax(y_,1))
-      correct_count = tf.reduce_sum(tf.cast(correct_prediction, tf.float32))
+      correct_count = tf.math.reduce_sum(tf.cast(correct_prediction, tf.float32))
       true_count = 0
       
     num_examples = self.data.num_test_example
@@ -360,10 +362,9 @@ class CDBN(object):
     print('Starting training the layer ' + rbm_layer_name + ' of CDBN ' + self.name)
     if self.verbosity > 0:
       print('--------------------------')
-  
     layer_input         = self.layer_name_to_object[self.layer_level_to_name[0]]
     input_placeholder   = tf.placeholder(tf.float32, shape=self.input)
-    step_placeholder    = tf.placeholder(tf.int32, shape=(1))  
+    step_placeholder    = tf.placeholder(tf.int32, shape=(1))
     input               = self._get_input_level(self.layer_name_to_level[rbm_layer_name], input_placeholder)
     a,b,c,error,control = self._one_step_pretraining(rbm_layer_name, input , n, step_placeholder)
     
@@ -373,7 +374,6 @@ class CDBN(object):
       input_images, _     = self.data.next_batch(self.batch_size, 'train')
       visible             = np.reshape(input_images, self.input)
       _,_,_,err,con       = self.session.run([a,b,c,error,control], feed_dict={input_placeholder: visible, step_placeholder : np.array([i])})
-
       if self.verbosity > 0:
         average_cost    = average_cost + err
         duration = time.time() - start_time
@@ -388,7 +388,7 @@ class CDBN(object):
         start_t = time.time()      
         
       if self.verbosity == 2 and i % 100 == 0 and not (i % 1000 == 0):
-        print('Step %d: reconstruction error = %.05f (%.3f sec) and weight upgrade to weight ratio is %.2f percent  -----  Estimated remaining time is %.0f sec' % (i, average_cost/(i % 1000), duration, average_control/(i % 1000)*1,(number_step-i)*(time.time() - start_t)/(i % 1000)))
+        print('Step %d: reconstruction error = %.05f (%.3f sec), err = %.05f, con = %.05f and weight upgrade to weight ratio is %.2f percent  -----  Estimated remaining time is %.0f sec' % (i, average_cost/(i % 1000), duration, err, con, average_control/(i % 1000)*1,(number_step-i)*(time.time() - start_t)/(i % 1000)))
       elif self.verbosity == 2 and i % 1000 == 0:
         print('Step %d: reconstruction error = %.05f (%.3f sec) and weight upgrade to weight ratio is %.2f percent  -----  Estimated remaining time is %.0f sec' % (i, average_cost/1000, duration, average_control/1000*1,(number_step-i)*(time.time() - start_t)/1000))
         average_cost    = 0
@@ -424,6 +424,7 @@ class CDBN(object):
     for i in range(1,step):
       self.soft_step += 1
       images_feed, labels_feed = self.data.next_batch(self.batch_size, 'train')
+      # images_feed, labels_feed = self.data.next_batch(10000, 'train')
       visible                  = np.reshape(images_feed, self.input)
       if fine_tune:
         _, a = self.session.run([self.train_step,self.cross_entropy_mean], feed_dict={self.input_placeholder: visible, self.y_: labels_feed})
@@ -512,7 +513,8 @@ class CDBN(object):
           ret_data = ret_layer.infer_probability(ret_data, method='forward', result = 'hidden') 
         if self.fully_connected_layer == i + 1:
           ret_data = tf.reshape(ret_data, [self.batch_size, -1])
-          ret_data = tf.reshape(ret_data, [self.batch_size, 1, 1, ret_data.get_shape()[1].value])     
+          # ret_data = tf.reshape(ret_data, [self.batch_size, 1, 1, ret_data.get_shape()[1].value])
+          ret_data = tf.reshape(ret_data, [self.batch_size, 1, 1, ret_data.get_shape()[1]])          
     return ret_data
       
         
@@ -527,6 +529,7 @@ class CDBN(object):
     visible_input          :        configuration of the visible layer of the CRBM to train
     n                      :        length of the gibbs chain for the contrastive divergence
     step                   :        step we are at (for the learning rate decay computation)"""
+    
     
     return self.layer_name_to_object[rbm_layer_name].do_contrastive_divergence(visible_input, n, step)
   
