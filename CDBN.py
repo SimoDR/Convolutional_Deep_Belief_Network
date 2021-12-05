@@ -423,8 +423,7 @@ class CDBN(object):
       average_control = 0
     for i in range(1,step):
       self.soft_step += 1
-      images_feed, labels_feed = self.data.next_batch(self.batch_size, 'train')
-      # images_feed, labels_feed = self.data.next_batch(10000, 'train')
+      images_feed, labels_feed = self.data.next_batch(self.batch_size, 'softmax_train')
       visible                  = np.reshape(images_feed, self.input)
       if fine_tune:
         _, a = self.session.run([self.train_step,self.cross_entropy_mean], feed_dict={self.input_placeholder: visible, self.y_: labels_feed})
@@ -433,7 +432,7 @@ class CDBN(object):
         average_control += b
       average_cost += a
       if self.verbosity > 0 and i % 250 == 0:
-        print('Step %d: cost is %.3f----- control value (gradient rate) : %.3f percent --- Estimated remaining time is %.0f sec' % (i, average_cost/250, average_control/250*100, (step-i)*(time.time() - start)/i))
+        print('Step %d: cost is %.7f----- control value (gradient rate) : %.7f percent --- Estimated remaining time is %.0f sec' % (i, average_cost/250, average_control/250*100, (step-i)*(time.time() - start)/i))
         average_cost = 0
         average_control = 0
     if self.verbosity > 0:
