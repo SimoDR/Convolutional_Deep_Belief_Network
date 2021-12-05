@@ -6,7 +6,7 @@ This code contains how to create a convolutional DBN from stacked convolutional 
 A convolutional deep belief network (CDBN) is a deep network which consists in a stack of convolutional restricted boltzmann machine (CRBM). 
 Because the gradient of the network is intractable, a greedy layer-wise training procedure is used. 
 More details can be found [here](https://www.cs.princeton.edu/~rajeshr/papers/icml09-ConvolutionalDeepBeliefNetworks.pdf) and [here](https://papers.nips.cc/paper/3048-greedy-layer-wise-training-of-deep-networks.pdf) and [here](https://www.cs.toronto.edu/~hinton/science.pdf).
-This project contains 3 files, `CDBN.py`, `CRBM.py` and `demo_cdbn_mnist.ipynb`.
+This project contains 4 files, `CDBN.py`, `CRBM.py`, `DATA_HANDLER.py` (in scr folder) and `demo_cdbn_mnist.ipynb`.
 Below is a description of each file, what it does and how to use it.
 
 
@@ -28,6 +28,9 @@ For one crbm, one can compute its energy, infer the probability forward or backw
 
 2. CDBN.py
 This file is the class that represent the whole network and can be composed of several crbm that stacked together. First the network is created empty and then layers can be added successively. A final softmax layer can also be added. After locking the network, the whole network can be trained by training each layer successively.
+
+3. DATA_HANDLER.py
+This file contains a class that is used to prepare data for a correct loading in the model.
 
 3. demo_cdbn_mnist.ipynb
 This file is a jupyter notebook containing a simple working example of CDBN used on the MNIST dataset. It works under the requirements specified before.
