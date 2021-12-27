@@ -12,7 +12,7 @@ class CRBM(object):
                init_biases_H = -3, init_biases_V = 0.01, init_weight_stddev = 0.01, 
                gaussian_unit = True, gaussian_variance = 0.2, 
                prob_maxpooling = False, padding = False,
-               batch_size = 20, learning_rate = 0.0001, learning_rate_decay = 0.5, momentum = 0.9, decay_step = 50000,  
+               batch_size = 50, learning_rate = 0.0001, learning_rate_decay = 0.5, momentum = 0.9, decay_step = 50000,  
                weight_decay = 0.1, sparsity_target = 0.1, sparsity_coef = 0.1):
     """INTENT : Initialization of a Convolutional Restricted Boltzmann Machine
     ------------------------------------------------------------------------------------------------------------------------------------------
@@ -170,7 +170,7 @@ class CRBM(object):
     
     'Computing HIDDEN layer with VISIBLE layer given'
     'Gaussian visible or not, hidden layer activation is a sigmoid'
-    if method == 'forward': 
+    if method == 'forward':
       if self.padding:
         conv = tf.nn.conv2d(operand, self.kernels, [1, 1, 1, 1], padding='SAME')
       else:
@@ -180,8 +180,8 @@ class CRBM(object):
       bias = tf.nn.bias_add(conv, self.biases_H)
       if self.prob_maxpooling: 
         'SPECIFIC CASE where we enable probabilistic max pooling'
-        exp = tf.math.softplus(bias)
-        # exp = tf.minimum(tf.math.exp(bias),10000000) # to avoid overflows that cause nan value during training
+        exp = tf.math.softplus(bias) # to avoid overflows that cause nan value during training
+        # exp = tf.math.exp(bias) 
         custom_kernel = tf.constant(1.0, shape=[2,2,self.filter_number,1])
         sum = tf.nn.depthwise_conv2d(exp, custom_kernel, [1, 2, 2, 1], padding='VALID')
         sum = tf.add(1.0,sum)
@@ -198,6 +198,7 @@ class CRBM(object):
         elif result == 'pooling': 
           'We want to obtain POOLING layer configuration'
           return tf.subtract(1.0,tf.math.divide_no_nan(1.0,sum))
+      
       return tf.sigmoid(bias)
     
     'Computing VISIBLE layer with HIDDEN layer given'
@@ -293,7 +294,7 @@ class CRBM(object):
     ret_bh = self._apply_grad(self.biases_H, g_biais_H, self.vitesse_biases_H,                                   sparsity = True, sparsity_value = g_biais_H_sparsity, global_step = global_step)
     cost = tf.math.reduce_sum(tf.square(tf.subtract(data,VN)))
     update = tf.math.reduce_sum(VN)
-    return ret_w, ret_bv, ret_bh, cost, update
+    return ret_w, ret_bv, ret_bh, cost, update, g_weight
       
         
       
@@ -403,7 +404,7 @@ class CRBM(object):
     ------------------------------------------------------------------------------------------------------------------------------------------
     REMARK : see http://ai.stanford.edu/~ang/papers/nips07-sparsedeepbeliefnetworkv2.pdf
     ------------------------------------------------------------------------------------------------------------------------------------------
-    REMARK : formultiplya is for hidden_bias: -2lambda*sumonwidth/height[meanonbatch[(1-Q0)Q0(target-meanonbatch[Q0])]]  
+    REMARK : formula is for hidden_bias: -2lambda*sumonwidth/height[meanonbatch[(1-Q0)Q0(target-meanonbatch[Q0])]]  
                         for kernel      -2lambda*sumonwidth/height[meanonbatch[(1-Q0)Q0(target-meanonbatch[Q0])v]]     vi+r-1,j+s-1,(l) = v"""
     
     ret = -2*self.sparsity_coef/self.batch_size
@@ -469,4 +470,10 @@ class CRBM(object):
     ------------------------------------------------------------------------------------------------------------------------------------------
     REMARK : only is self.padding is True because if self.padding is False then this is not needed"""
     
-    return tf.pad(visible,[[0,0],[np.floor((self.filter_height-1)/2).astype(int),np.ceil((self.filter_height-1)/2).astype(int)],[np.floor((self.filter_width-1)/2).astype(int),np.ceil((self.filter_width-1)/2).astype(int)],[0,0]])      
+    return tf.pad(visible,[[0,0],[np.floor((self.filter_height-1)/2).astype(int),np.ceil((self.filter_height-1)/2).astype(int)],[np.floor((self.filter_width-1)/2).astype(int),np.ceil((self.filter_width-1)/2).astype(int)],[0,0]]) 
+
+
+
+
+  # def get_rbm_filters(self):
+  #   return self.kernels.eval(session=sess)

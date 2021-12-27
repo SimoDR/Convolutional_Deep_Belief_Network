@@ -22,9 +22,9 @@ class DATA_HANDLER(object):
     self.num_test_example     = test_data.shape[0]
 
     self.whiten               = False
-    self.unsupervised_training_index       = -20
-    self.supervised_training_index       = -20
-    self.test_index           = -20
+    self.unsupervised_training_index       = 0
+    self.supervised_training_index       = 0
+    self.test_index           = 0
     
   # needs work
 
@@ -78,7 +78,6 @@ class DATA_HANDLER(object):
       self.test_index = (batch_size + self.test_index) % self.num_test_example
       index = self.test_index
       number = self.num_test_example
-
     if index + batch_size > number:
       part1 = operand[index:,:]
       part2 = operand[:(index + batch_size)% number,:]
