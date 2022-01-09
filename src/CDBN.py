@@ -50,7 +50,20 @@ class CDBN(object):
         
         
         
-  def auto_calulate_layer(self,layer_number,fully_connected,prob_maxpooling,padding,f_height,f_width,f_number):
+  def _auto_calulate_layer(self,layer_number,fully_connected,prob_maxpooling,padding,f_height,f_width,f_number):
+    """INTENT : Calculate automatically the size of the input layer that we are building based on the previous layer configuration
+    ------------------------------------------------------------------------------------------------------------------------------------------
+    PARAMETERS :
+    layer_number          :         which layer is being built (number)
+    fully_connected       :         whether the current layer is fully connected or not
+    prob_maxpooling       :         whether the current layer has prob_maxpooling enabled or not
+    padding               :         whether the current layer has padding enabled or not
+    f_height              :         f_height of current layer
+    f_width               :         f_width of current layer 
+    f_number              :         f_number of current layer
+    ------------------------------------------------------------------------------------------------------------------------------------------
+    REMARK : this works for deep layers only (not the first one) """
+
     previous_layer = self.layer_name_to_object[self.layer_level_to_name[layer_number-1]]
     if not fully_connected:
       v_height = previous_layer.hidden_height / (previous_layer.prob_maxpooling + 1)
@@ -114,7 +127,7 @@ class CDBN(object):
         if v_height == "auto" or v_width == "auto" or v_channels == "auto":
           if self.layer_name_to_level[name] != 0:
             if v_height == "auto" and v_width == "auto" and v_channels == "auto":
-              v_height, v_width, v_channels = self.auto_calulate_layer(self.layer_name_to_level[name],fully_connected,prob_maxpooling,padding,f_height,f_width,f_number)
+              v_height, v_width, v_channels = self._auto_calulate_layer(self.layer_name_to_level[name],fully_connected,prob_maxpooling,padding,f_height,f_width,f_number)
             else:
               raise ValueError('You either set all 3 parameters to "auto" or none')
           else:
@@ -159,7 +172,7 @@ class CDBN(object):
             message += 'with no padding and stride = 1'
           message += '\nHidden:  ('+str(self.layer_name_to_object[name].hidden_height)+','+str(self.layer_name_to_object[name].hidden_width)+','+str(self.layer_name_to_object[name].filter_number)+')' 
           if self.verbosity > 1 and prob_maxpooling:
-            message += '\nProbabilistic max pooling ON with stride = 2: '
+            message += '\nProbabilistic max pooling ON with dimension (2,2) and stride = 2: '
           elif prob_maxpooling == False:
             message += '\nProbabilistic max pooling OFF '
         if self.verbosity > 1 and gaussian_unit:
@@ -318,7 +331,6 @@ class CDBN(object):
   def do_eval(self, f1 = False):
     """INTENT : Evaluate the CDBN as a classifier"""
 
-
     input_placeholder  = tf.placeholder(tf.float32, shape=self.input)
     
     eval = tf.reshape(self._get_input_level(self.number_layer,input_placeholder), [self.batch_size, -1])
@@ -344,13 +356,17 @@ class CDBN(object):
       correct_count = tf.math.reduce_sum(tf.cast(correct_prediction, tf.float32))
       true_count = 0
 
+    # evaluate on the training set
     num_test = []
     num_test.append(self.data.num_sup_training_example)
     num_test.append(self.data.num_test_example)
 
+    # evaluate on the test set
     test_type = []
     test_type.append('softmax_train')
     test_type.append('test')
+
+    result = []
 
     for i in range(2):
       num_examples = num_test[i]
@@ -384,8 +400,8 @@ class CDBN(object):
       else:
         precision = true_count / num_examples
         print('Successfully evaluated the CDBN on the',test_type[i],'set: \n %d examples are correctly classified out of %d total examples\n Precision is %0.02f percent' %(true_count, num_examples, precision*100))
-  
-        
+        result.append((tf.constant(precision*100)).eval(session=self.session))
+    return result
 
   def _pretrain_layer(self, rbm_layer_name, number_step, n = 1):
     """INTENT : Pretrain the given layer
@@ -445,7 +461,7 @@ class CDBN(object):
       
         
       
-  def _do_softmax_training(self, step = 2000, fine_tune = False, learning_rate = 0.5):
+  def _do_softmax_training(self, step = 5000, fine_tune = False, learning_rate = 0.5):
     """INTENT : Train the softmax output layer of our CDBN
     ------------------------------------------------------------------------------------------------------------------------------------------
     PARAMETERS :
@@ -542,7 +558,7 @@ class CDBN(object):
     PARAMETERS :
     layer_level         :        level of the layer we need to go from bottom up to
     input_data          :        input data for the visible layer of the bottom of the cdbn"""
-    
+
     ret_data = input_data
     if not layer_level == 0:
       for i in range(layer_level):
@@ -574,9 +590,6 @@ class CDBN(object):
     return self.layer_name_to_object[rbm_layer_name].do_contrastive_divergence(visible_input, n, step)
   
   
-  # def get_filters(self):
-  #   return self.layer_name_to_object['layer_1'].get_rbm_filters()
-
   
   
   def _print_error_message(self,error):

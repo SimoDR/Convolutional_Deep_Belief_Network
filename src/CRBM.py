@@ -442,9 +442,8 @@ class CRBM(object):
     """INTENT : Not only flip kernel horizontally and vertically but also swap in and out channels"""
     # rev = tf.reverse(self.kernels,[True,True,False,False]) # Original
     rev = tf.reverse(self.kernels,[True,False]) # TO CHECK
+    # rev = tf.reverse(self.kernels,[0,1]) # TO CHECK
     return tf.transpose(rev,perm=[0, 1, 3, 2])
-      
-        
         
         
 
@@ -474,6 +473,3 @@ class CRBM(object):
 
 
 
-
-  # def get_rbm_filters(self):
-  #   return self.kernels.eval(session=sess)
