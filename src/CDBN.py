@@ -399,7 +399,7 @@ class CDBN(object):
         print('Successfully evaluated the CDBN on the',test_type[i],'set: \n Precision is %0.02f percent \n Recall is %0.02f percent \n F1 score is %0.02f\n tp: %d ---  fp: %d ---  tn: %d ---  fn: %d\n Overall precision is %0.02f percent' %(precision*100, recall*100, f1_score, tp_count, fp_count, tn_count, fn_count, overall_precision * 100))
       else:
         precision = true_count / num_examples
-        print('Successfully evaluated the CDBN on the',test_type[i],'set: \n %d examples are correctly classified out of %d total examples\n Precision is %0.02f percent' %(true_count, num_examples, precision*100))
+        print('Successfully evaluated the CDBN on the',test_type[i],'set: \n %d examples are correctly classified out of %d total examples\n Accuracy is %0.02f percent' %(true_count, num_examples, precision*100))
         result.append((tf.constant(precision*100)).eval(session=self.session))
     return result
 
