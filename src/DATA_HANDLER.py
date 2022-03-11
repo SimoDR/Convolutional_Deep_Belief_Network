@@ -22,38 +22,50 @@ class DATA_HANDLER(object):
     self.num_test_example     = test_data.shape[0]
 
     self.whiten               = False
-    self.unsupervised_training_index       = -20
-    self.supervised_training_index       = -20
-    self.test_index           = -20
+    self.unsupervised_training_index       = 0
+    self.supervised_training_index       = 0
+    self.test_index           = 0
     
   # needs work
 
-  # def do_whiten(self):
-  #   self.whiten         = True
-  #   data_to_be_whitened = np.copy(self.training_data)
-  #   mean                = np.sum(data_to_be_whitened, axis = 0)/self.num_training_example
-  #   mean                = np.tile(mean,self.num_training_example)
-  #   mean                = np.reshape(mean,(self.num_training_example,784))
-  #   centered_data       = data_to_be_whitened - mean                
-  #   covariance          = np.dot(centered_data.T,centered_data)/self.num_training_example
-  #   U,S,V               = np.linalg.svd(covariance)
-  #   epsilon = 1e-5
-  #   lambda_square       = np.diag(1./np.sqrt(S+epsilon))
-  #   self.whitening_mat  = np.dot(np.dot(U, lambda_square), V)    
-  #   self.whitened_training_data  = np.dot(centered_data,self.whitening_mat)
+  def do_whiten(self):
+    self.whiten         = True
+    data_to_be_whitened = np.copy(self.unsupervised_training_data)
+    mean                = np.sum(data_to_be_whitened, axis = 0)/self.num_unsup_training_example
+    mean                = np.tile(mean,self.num_unsup_training_example)
+    mean                = np.reshape(mean,(self.num_unsup_training_example,784))
+    centered_data       = data_to_be_whitened - mean                
+    covariance          = np.dot(centered_data.T,centered_data)/self.num_unsup_training_example
+    U,S,V               = np.linalg.svd(covariance)
+    epsilon = 1e-5
+    lambda_square       = np.diag(1./np.sqrt(S+epsilon))
+    self.whitening_mat  = np.dot(np.dot(U, lambda_square), V)    
+    self.whitened_unsupervised_training_data  = np.dot(centered_data,self.whitening_mat)
     
-  #   data_to_be_whitened = np.copy(self.test_data)
-  #   mean                = np.sum(data_to_be_whitened, axis = 0)/self.num_test_example
-  #   mean                = np.tile(mean,self.num_test_example)
-  #   mean                = np.reshape(mean,(self.num_test_example,784))
-  #   centered_data       = data_to_be_whitened - mean  
-  #   self.whitened_test_data  = np.dot(centered_data,self.whitening_mat)
+    data_to_be_whitened = np.copy(self.supervised_training_data)
+    mean                = np.sum(data_to_be_whitened, axis = 0)/self.num_sup_training_example
+    mean                = np.tile(mean,self.num_sup_training_example)
+    mean                = np.reshape(mean,(self.num_sup_training_example,784))
+    centered_data       = data_to_be_whitened - mean                
+    covariance          = np.dot(centered_data.T,centered_data)/self.num_sup_training_example
+    U,S,V               = np.linalg.svd(covariance)
+    epsilon = 1e-5
+    lambda_square       = np.diag(1./np.sqrt(S+epsilon))
+    self.whitening_mat  = np.dot(np.dot(U, lambda_square), V)    
+    self.whitened_supervised_training_data  = np.dot(centered_data,self.whitening_mat)
+
+    data_to_be_whitened = np.copy(self.test_data)
+    mean                = np.sum(data_to_be_whitened, axis = 0)/self.num_test_example
+    mean                = np.tile(mean,self.num_test_example)
+    mean                = np.reshape(mean,(self.num_test_example,784))
+    centered_data       = data_to_be_whitened - mean  
+    self.whitened_test_data  = np.dot(centered_data,self.whitening_mat)
 
     
   def next_batch(self, batch_size, type = 'train'):
     if type == 'train': # unsupervised training
       if self.whiten:
-        operand = self.whitened_training_data
+        operand = self.whitened_unsupervised_training_data
       else:
         operand = self.unsupervised_training_data
       operand_bis = self.unsupervised_training_labels
@@ -62,7 +74,7 @@ class DATA_HANDLER(object):
       number = self.num_unsup_training_example
     elif type == 'softmax_train': # supervised training
       if self.whiten:
-        operand = self.whitened_training_data
+        operand = self.whitened_supervised_training_data
       else:
         operand = self.supervised_training_data
       operand_bis = self.supervised_training_labels
@@ -78,7 +90,6 @@ class DATA_HANDLER(object):
       self.test_index = (batch_size + self.test_index) % self.num_test_example
       index = self.test_index
       number = self.num_test_example
-
     if index + batch_size > number:
       part1 = operand[index:,:]
       part2 = operand[:(index + batch_size)% number,:]
